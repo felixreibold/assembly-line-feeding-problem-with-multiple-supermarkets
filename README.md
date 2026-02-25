@@ -10,8 +10,6 @@ The model extends the Assembly Line Feeding Problem (ALFP) by introducing multip
 
 The implementation is written in Python using Gurobi.
 
----
-
 ## Model Overview
 
 The model simultaneously determines:
