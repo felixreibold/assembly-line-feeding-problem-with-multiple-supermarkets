@@ -1,0 +1,2 @@
+# assembly-line-feeding-problem-with-multiple-supermarkets
+Extension of the Assembly Line Feeding Problem model by Adenipekun et al. (2022), integrating multiple supermarkets into the existing MILP framework. The project optimizes feeding policies, vehicle types, routes, and supermarket allocation to minimize total logistics costs. Implemented in Python using Gurobi and evaluated via numerical experiments.
