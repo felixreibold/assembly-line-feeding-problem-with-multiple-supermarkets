@@ -25,8 +25,6 @@ Objective: minimize total feeding costs including transportation, replenishment,
 
 For full theoretical background, formulation, and numerical experiments, please refer to the included paper.
 
----
-
 ## Requirements
 - Python 3.10+
 - Gurobi (licensed)
