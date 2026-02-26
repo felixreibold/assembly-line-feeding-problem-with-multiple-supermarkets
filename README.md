@@ -1,10 +1,10 @@
 ﻿# Assembly Line Feeding Problem with Multiple Supermarkets (MILP)
 
-Extension of the Assembly Line Feeding Problem model by Adenipekun et al. (2022), integrating multiple supermarkets into the existing MILP framework. The model optimizes feeding policies, vehicle types, routes, and supermarket allocation to minimize total logistics costs. Implemented in Python using Gurobi and evaluated via numerical experiments.
+Extension of the Assembly Line Feeding Problem model by [Adenipekun et al. (2022)](https://doi.org/10.1016/j.omega.2021.102544), integrating multiple supermarkets into the existing MILP framework. The model optimizes feeding policies, vehicle types, routes, and supermarket allocation to minimize total logistics costs. Implemented in Python using Gurobi and evaluated via numerical experiments.
 
 This repository contains the full implementation of the MILP model developed in our seminar paper:
 
-[Final Report (PDF)](final-report-assembly-line-feeding-problem.pdf)
+[Reibold F., Voigtländer S. (2024) Extension of the assembly line feeding problem by introducing multiple supermarkets. Seminar paper, Technical University of Munich.](seminar-paper-assembly-line-feeding-problem.pdf)
 
 The model extends the Assembly Line Feeding Problem (ALFP) by introducing multiple supermarkets and integrating tactical supermarket assignment decisions into the existing cost-minimization framework.
 
@@ -37,7 +37,7 @@ Datasets are algorithmically generated and correspond to the experimental design
 
 ### Fixed constants (`data/Input_data/`)
 
-These inputs are derived from Adenipekun et al. (2022) or chosen by us for the numerical experiments:
+These inputs are derived from [Adenipekun et al. (2022)](https://doi.org/10.1016/j.omega.2021.102544) or chosen by us for the numerical experiments:
 
 - `Input_Data.xlsx`
 - `n_pm.xlsx`
@@ -165,3 +165,12 @@ If infeasible, it may write an IIS .ilp file.
 ## Authors
 
 Felix Reibold (M.Sc.); Steffen Voigtländer (M.Sc.)
+
+
+## Citation
+
+If you use this code or model, please cite:
+
+Reibold F., Voigtländer S. (2024)  
+**Extension of the assembly line feeding problem by introducing multiple supermarkets.**  
+Seminar paper, Technical University of Munich.
