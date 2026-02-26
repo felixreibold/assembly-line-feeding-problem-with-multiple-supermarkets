@@ -136,6 +136,8 @@ This runs:
 - free feeding-policy choice (recommended default)
 
 ### Run one instance with explicit parameters
+Please take a look at data/datasets to see which values for the CLI parameters `instance` and `assignment` can be used with the available datasets.
+
 ```bash
 python -m src.run_experiment --instance 10x2 --assignment 10_02 --time-limit 600
 ```
