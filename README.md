@@ -80,10 +80,12 @@ Example: data/datasets/distance_matrix_10x2_storage_to_stations.xlsx
 
 #### 2. Warehouse → Supermarkets
 
-Distances between warehouse and supermarkets: data/datasets/distance_matrix_10x2_warehouse_to_supermarkets.xlsx
+Distances between warehouse and supermarkets
+
+Example: data/datasets/distance_matrix_10x2_warehouse_to_supermarkets.xlsx
 
 
-### Instance naming convention
+#### Instance naming convention (Distance Matrices)
 
 Example: `10x2`
 
@@ -105,7 +107,9 @@ Examples:
   - part_station_assignment_10_02.xlsx
   - ...
 
-Naming convention: i.e. `10_00`, `10_01`, `10_02`
+#### Instance naming convention (Part-to-Station Assignments)
+
+Example: i.e. `10_00`, `10_01`, `10_02`
 
 - `10` → number of stations  
 - `02` → indicates a part-station assignment variation (i.e. these variations can represent different car models on the same automotive assembly line).
