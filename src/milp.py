@@ -6,14 +6,20 @@ Created on Tue Jan  9 11:00:00 2024
 @author: Felix Reibold, Steffen Voigtlaender
 """
 
+from __future__ import annotations
+
 import gurobipy as gp
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import openpyxl
 import time
 
-################################################################################################################################################################
+
 # Create output
+'''
+# Very verbose output, prints every decision variable of the solution
+
 def Output(m):  
     # Print the result
     status_code = {1:'LOADED', 2:'OPTIMAL', 3:'INFEASIBLE', 4:'INF_OR_UNBD', 5:'UNBOUNDED', 9: 'TIME_LIMIT'} 
@@ -27,16 +33,36 @@ def Output(m):
         for v in m.getVars():
             print(str(v.varName) + " = " + str(v.x))    
         print('Optimal objective value: ' + str(m.objVal) + "\n")
+'''
+
+# Less verbose output, prints only non-zero decision variables of the solution
+def Output(m):
+    status_code = {1:'LOADED', 2:'OPTIMAL', 3:'INFEASIBLE', 4:'INF_OR_UNBD', 5:'UNBOUNDED', 9: 'TIME_LIMIT'}
+    status = m.status
+
+    '''
+    for v in m.getVars():
+        if v.VType != gp.GRB.CONTINUOUS and v.X > 0.5:
+            print(v.VarName, "=", v.X)
+    '''
+
+    print('The optimization status is ' + status_code[status])
+
+    if status in [2, 9] and m.SolCount > 0:
+        print('Optimal objective value: ' + str(m.objVal) + "\n")
         
 # Define MILP Model        
-def Model_1_TC (H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m_i, V_i, r_a5, nt_5, l_pF, n_ip, n_pm, demand_i, dWS_b, l_pm, dW_s, dS_sb, station_families, n_f, demand_f, ca, ov, s_ip, wd_p, cl, AL_pb, ntr_2, ht_ip, mv, ALk_pb, q_p, families_parts, L_p, L_s, h_2, w_2, BIG_M_route, mr1_r, mr2_rb, BIG_M_storage, d_p):
-    
+def Model_1_TC (H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m_i, V_i, r_a5, nt_5, l_pF, n_ip, n_pm, demand_i, dWS_b, l_pm, dW_s, dS_sb, station_families, n_f, demand_f, ca, ov, s_ip, wd_p, cl, AL_pb, ntr_2, ht_ip, mv, ALk_pb, q_p, families_parts, L_p, L_s, h_2, w_2, BIG_M_route, mr1_r, mr2_rb, BIG_M_storage, d_p, time_limit=600, use_preassigned_policy=False):
+
+    # expects global data objects to be set by runner
+    global assignment_parts_stations, df, stations, Fix_S
+
     start_time = time.time()    
     # Create the optimization model
     model = gp.Model()
     # Set parameters
     model.setParam('OutputFlag', True)
-    model.setParam('TimeLimit', 600)
+    model.setParam('TimeLimit', int(time_limit))
 
     # Parts
     I = len(assignment_parts_stations)
@@ -114,11 +140,26 @@ def Model_1_TC (H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m
     #General constarints
     #Each part is assigned to exactly one feeding policy p, one vehicle type m and one supermarket b
     #model.addConstrs( gp.quicksum(x_ipmb[i, p, m, b] for p in range(P) for m in range(M) for b in range(B)) == 1 for i in range(I))
+
+
+    # USE_PREASSIGNED_POLICY = False  # set True to enforce column p in part-station assignment .xlsx file
+    # default run uses free choice (guaranteed runnable)
+    # preassignment can be enabled, but may generate infeasible instances depending on the generated data
+
+    if use_preassigned_policy:
+        # Constraint only active if feeding policy is pre-assigned
+        model.addConstrs(
+            gp.quicksum(
+                x_ipmb[i, int(assignment_parts_stations[i, 12] - 1), m, b] for m in range(M) for b in range(B)) == 1 for i in range(I)
+        )
+    else:
+        # Free/Unconstrained policy choice (makes model much bigger)
+        # Each part is assigned to exactly one feeding policy p, one vehicle type m and one supermarket b
+        model.addConstrs(
+            gp.quicksum(x_ipmb[i, p, m, b] for p in range(P) for m in range(M) for b in range(B)) == 1 for i in range(I)
+        )
     
-    
-    #Constraint only active if feeding policy is pre-assigned
-    model.addConstrs(gp.quicksum(x_ipmb[i, int(assignment_parts_stations[i, 12] - 1), m, b] for m in range(M) for b in range(B)) == 1 for i in range(I))
-    
+
     
     #boxed supply not possible if parts to big
     model.addConstrs(
@@ -354,8 +395,9 @@ def Model_1_TC (H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m
     fix_cost_supermarket = gp.quicksum(((SC * Cap_b[b]) + Fix_S) * y_b[b] for b in range(B))
 
     model.setObjective(transportation_costs_forklift   + transportation_costs_TT_and_AGV + transportation_costs_sequenced_parts + transportation_costs_stationary_kits + transportation_costs_travelling_kits + fix_cost_supermarket, sense = gp.GRB.MINIMIZE)
-    obj_value = model.getObjective().getValue()
-    
+
+
+    '''
     # Optimize the model
     model.optimize()
     #model.write('mp.lp')
@@ -366,181 +408,30 @@ def Model_1_TC (H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m
     # Calculate and print the duration
     duration = end_time - start_time
     print("Optimization duration: {:.2f} seconds".format(duration))
+    '''
+
+    model.optimize()
+
+    # If Gurobi returns INF_OR_UNBD, re-run with DualReductions=0 to distinguish.
+    if model.status == gp.GRB.INF_OR_UNBD:
+        model.setParam(gp.GRB.Param.DualReductions, 0)
+        model.optimize()
+
+    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    if model.SolCount > 0:
+        model.write(f"MILP_solution_{timestamp}.sol")
+
+    Output(model)
+
+    if model.status == gp.GRB.INFEASIBLE:
+        model.computeIIS()
+        model.write(f"MILP_iis_{timestamp}.ilp")
+
+    return {
+        "status": model.status,
+        "solcount": model.SolCount,
+        "objective": model.objVal if model.SolCount > 0 else None,
+        "runtime": model.Runtime
+    }
     
-    return obj_value
-    
 
-# Read Input and data preparation
-
-excel_file_path = 'Input_Data.xlsx'
-Input = openpyxl.load_workbook(excel_file_path)
-sheet = Input['Tabelle1']
-#Utilisation rate of vehicle type m
-muy_m = np.array([cell.value for cell in sheet['B4:D4'][0]])
-#Velocity of vehicle type m
-v_m = np.array([cell.value for cell in sheet['B5:D5'][0]])
-#Planning horizon
-H = sheet['B6'].value
-#Cost of moving vehicle type m on the shop floor
-co_m = np.array([cell.value for cell in sheet['B7:D7'][0]])
-#Wage costs for supermarket associate
-Fix_S = sheet['B32'].value
-#Capacity of supermarket b
-Cap_b = [cell.value for cell in sheet['B8:C8'][0]]
-#costs per part capacity unit in supermarket (rent)
-SC = sheet['B9'].value
-#Number of stationary kits that fit into a kit container
-nk_4 = sheet['B12'].value
-#Number of travelling kits that fit into a kit container
-nt_5 = sheet['B14'].value
-#Number of shelves in a rack used for boxed supply containers (number of containers)
-h_2 = sheet['B16'].value
-#Number of boxes fitting in a rack shelf used for boxed supply
-w_2 = sheet['B17'].value
-#Minimum number of facings for containers of feeding policy p,
-q_p = np.array([cell.value for cell in sheet['B18:F18'][0]])
-#Length of the BoL at station s
-L_s = sheet['B19'].value 
-#Length of facing for feeding policy p ∈ {1, 2, 3, 4}
-L_p = np.array([cell.value for cell in sheet['B20:F20'][0]]) 
-#Wage of a logistical operator
-cl = sheet['B22'].value 
-#Aisle length in the preparation area corresponding to line feeding policy p
-AL_pb = np.array([cell.value for cell in sheet['B23:F23'][0]])  
-#Batch size: Number of bins that fit into a trolley in the preparation area   
-ntr_2 = sheet['B24'].value 
-#Walking velocity of an operator
-ov = sheet['B25'].value 
-#Walking distance in the preparation area between several variants of the same family
-mv =  sheet['B28'].value 
-#Aisle length in the preparation area corresponding to kitted parts
-ALk_pb = np.array([cell.value for cell in sheet['B29:F29'][0]]) 
-#Walking distance at the assembly line to pick parts corresponding to feeding policy p ∈ {1, 2, 3, 4}
-wd_p =  sheet['B30'].value 
-#Wage of an assembly operator
-ca = sheet['B31'].value
-#BIG M values
-BIG_M_route = sheet['B33'].value  
-BIG_M_storage = sheet['B34'].value 
-#Search time for part i corresponding to line feeding policy p at the preparation area and BoL
-s_ip = sheet['B37'].value 
-#Preparation handling time required for part i corresponding to line feeding policy p ∈ P′
-ht_ip = sheet['B38'].value 
-#Forklift loading and unloading time for feeding policy p
-l_pF = np.array([cell.value for cell in sheet['B21:F21'][0]]) 
-#Depth of rack used for feeding policy p (number of containers)
-d_p = np.array([cell.value for cell in sheet['B35:C35'][0]])  
-#Two-way distance between warehouse and supermarket
-dWS_b = np.array([cell.value for cell in sheet['B36:C36'][0]]) 
-
-excel_file_path_distance_matrix = 'distance_matrix_10x2_storage_to_stations.xlsx'
-distance_matrix = pd.read_excel(excel_file_path_distance_matrix).to_numpy()
-distance_matrix_1 = distance_matrix[1:3, :]
-station_length = sheet['B10'].value
-stations = distance_matrix_1.shape[1]
-
-#Maximum volume possible in a container of policy p and Maximum weight allowed in a container of policy p
-r_a2 = np.array([cell.value for cell in sheet['B11:C11'][0]]).astype(float)
-r_a4 = np.array([cell.value for cell in sheet['B13:C13'][0]]).astype(float)
-r_a5 = np.array([cell.value for cell in sheet['B15:C15'][0]]).astype(float)
-
-
-milk_run_lengths = []
-
-#Route creation and definition
-for i in range(stations):
-    for j in range(i + 1, stations + 1):
-        route = list(range(i + 1, j + 1))
-        length = [0] * len(Cap_b)  
-        for b in range(len(Cap_b)):
-            length[b] = distance_matrix_1[b][route[0] - 1] 
-            for k in range(len(route) - 1):
-                length[b] += station_length 
-            length[b] += distance_matrix_1[b][route[-1] - 1] 
-        milk_run_lengths.append((route, length))
-
-routes_array = np.array(milk_run_lengths, dtype=object)
-split_lengths = [(route, length[0], length[1]) for route, length in routes_array]
-df = pd.DataFrame(split_lengths, columns=['Route', 'Length_1', 'Length_2'])
-dW_s = distance_matrix[0, :] * 2 
-dS_sb = distance_matrix[1:3, :] * 2             
-excel_file_path_assignment_parts_stations = 'part_station_assignment_10_02.xlsx'
-assignment_parts_stations = pd.read_excel(excel_file_path_assignment_parts_stations)
-assignment_parts_stations = assignment_parts_stations.to_numpy()    
-columns_5_6 = assignment_parts_stations[:, 5:7]
-r_ia = np.array(columns_5_6)   
-m_i = np.array(assignment_parts_stations[:, 7])
-V_i = np.array(assignment_parts_stations[:, 8])
-n_ip = np.array(assignment_parts_stations[:, 10:12])   
-demand_i = np.array(assignment_parts_stations[:, 9])                                                
-mr_rb = np.array(df[[f'Length_{i+1}' for i in range(len(Cap_b))]])
-
-#Number of bins or containers that fit into a vehicle type m
-excel_file_path_n_pm = 'n_pm.xlsx'
-Input_n_pm = openpyxl.load_workbook(excel_file_path_n_pm)
-Input_n_pm = Input_n_pm['Tabelle1']
-num_rows = 5
-num_cols = 3
-n_pm = [[Input_n_pm.cell(row=i, column=j).value for j in range(1, num_cols + 1)] for i in range(1, num_rows + 1)]
-n_pm = np.array(n_pm)
-
-#l_pm
-excel_file_path_l_pm = 'l_pm.xlsx'
-Input_l_pm = openpyxl.load_workbook(excel_file_path_l_pm)
-Input_l_pm = Input_l_pm['Tabelle1']
-l_pm = np.array([[Input_l_pm.cell(row=i, column=j).value for j in range(1, num_cols + 1)] for i in range(1, num_rows + 1)])
-
-station_families = {}
-for row in assignment_parts_stations:
-    station = int(row[1])  
-    family = int(row[3])  
-    family -= 1
-    if station not in station_families:
-        station_families[station] = set()
-    station_families[station].add(family)
-    
-families_parts = {}
-for row in assignment_parts_stations:
-    part = int(row[0])  
-    family = int(row[3])  
-    part -= 1
-    if family not in families_parts:
-        families_parts[family] = set()
-    families_parts[family].add(part)
-    
-#demand_f
-excel_file_path = 'n_f.xlsx'
-Input_nf = openpyxl.load_workbook(excel_file_path)
-Input_nf = Input_nf['Tabelle1']
-last_row = Input_nf.max_row
-while Input_nf.cell(row=last_row, column=1).value is None and last_row > 1:
-    last_row -= 1
-values_a = [Input_nf.cell(row=i, column=1).value for i in range(2, last_row + 1)]
-values_b = [Input_nf.cell(row=i, column=2).value for i in range(2, last_row + 1)]
-
-#family demand
-demand_f = np.array(values_a)
-n_f = np.array(values_b)
-
-
-#Milk run length for route r from the warehouse
-milk_run_lengths_w1 = []
-distance_matrix_1 = distance_matrix[0, :]
-for i in range(stations):
-    for j in range(i + 1, stations + 1):
-        route_w1 = list(range(i + 1, j + 1))
-        route_length = [0] * 1  
-        route_length = distance_matrix_1[route_w1[0] - 1] 
-        for k in range(len(route_w1) - 1):
-                route_length += station_length  
-        route_length += distance_matrix_1[route_w1[-1] - 1]  
-        milk_run_lengths_w1.append((route_w1, route_length))
-routes_array_w1 = np.array(milk_run_lengths_w1, dtype=object)
-df_w1 = pd.DataFrame(routes_array_w1, columns=['Route', 'Length'])
-mr1_r = df_w1['Length'].to_numpy(dtype=float)
-
-#Milk run length for route r from the supermarket 
-mr2_rb = df[['Length_1', 'Length_2']]
-mr2_rb = mr2_rb.values
-
-OptModel_low = Model_1_TC(H, muy_m, v_m, co_m, Cap_b, SC, mr_rb, r_a2, r_ia, nk_4, r_a4, m_i, V_i, r_a5, nt_5, l_pF, n_ip, n_pm, demand_i, dWS_b, l_pm, dW_s, dS_sb, station_families, n_f, demand_f, ca, ov, s_ip, wd_p, cl, AL_pb, ntr_2, ht_ip, mv, ALk_pb, q_p, families_parts, L_p, L_s, h_2, w_2, BIG_M_route, mr1_r, mr2_rb, BIG_M_storage, d_p)    

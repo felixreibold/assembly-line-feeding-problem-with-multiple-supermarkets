@@ -1,8 +1,26 @@
-﻿.venv/
+﻿# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache / compiled files
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# IDEs / editors
 .idea/
+.vscode/
+
+# Optimization outputs (Gurobi etc.)
 results/
 *.sol
 *.lp
 *.log
+*.ilp
+*.mps
+
+# OS files
+.DS_Store
+Thumbs.db
